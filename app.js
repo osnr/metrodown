@@ -114,6 +114,7 @@ function render(s) {
         }
         const stop = {
           name: line,
+          id: line,
           terminates
         };
         for (let route of activeRoutes) {
@@ -136,22 +137,18 @@ function render(s) {
   console.log(routes);
 
   var graph = {
-    nodes: [
-      ...new Set([].concat.apply([], Object.values(routes)))
-    ].map(stop => ({
-      id: stop.name,
-      group: 1
-    })),
+    nodes: [...new Set([].concat.apply([], Object.values(routes)))],
     links: [].concat.apply(
       [],
-      Object.values(routes).map(function(route) {
+      Object.keys(routes).map(function(routeName) {
+        const routeStops = routes[routeName];
         const routeLinks = [];
-        for (let i = 0; i < route.length; i++) {
-          if (!route[i + 1]) continue;
+        for (let i = 0; i < routeStops.length; i++) {
+          if (!routeStops[i + 1]) continue;
           routeLinks.push({
-            source: route[i].name,
-            target: route[i + 1].name,
-            value: 1
+            source: routeStops[i],
+            target: routeStops[i + 1],
+            routeName
           });
         }
         return routeLinks;
@@ -175,7 +172,8 @@ function render(s) {
       })
     )
     .force("charge", d3.forceManyBody())
-    .force("center", d3.forceCenter(width / 2, height / 2));
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .stop();
 
   var link = svg
     .append("g")
@@ -184,8 +182,9 @@ function render(s) {
     .data(graph.links)
     .enter()
     .append("line")
+    .attr("stroke", d => d.routeName.toLowerCase())
     .attr("stroke-width", function(d) {
-      return Math.sqrt(d.value);
+      return 1;
     });
 
   var node = svg
@@ -206,9 +205,9 @@ function render(s) {
 
   node
     .append("circle")
-    .attr("r", 5)
+    .attr("r", 4)
     .attr("fill", function(d) {
-      return color(d.group);
+      return "black";
     });
 
   node
@@ -227,6 +226,18 @@ function render(s) {
 
   simulation.force("link").links(graph.links);
 
+  for (
+    var i = 0,
+      n = Math.ceil(
+        Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay())
+      );
+    i < n;
+    ++i
+  ) {
+    simulation.tick();
+  }
+
+  ticked();
   function ticked() {
     link
       .attr("x1", function(d) {
